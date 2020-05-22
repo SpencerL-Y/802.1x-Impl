@@ -5,18 +5,27 @@
 
 
 int exist_array[10] = {0};
+pcap_t* selectedAdp;
 int main()
 {
-	list<DeviceIdPair*> list = listAdaptor();
+	cout << "list adp" << endl;
+	//list<DeviceIdPair*> list = listAdaptor();
+	cout << "end list" << endl;
 	char strMsg[] = { "Broadcasting.." };
 
 	int id;
 	cout << "select adaptor: ";
-	cin >> id;
-	pcap_if_t* selectedIf = selectAdaptor(id, list);
-	char sndBuf[200];
+	//pcap_if_t* selectedIf = selectAdaptor(id, list);
 	char errbuf[100];
-	pcap_t* selectedAdp = pcap_open_live(selectedIf->name, 65536, 1, 1000, errbuf);
+	char* if_name = pcap_lookupdev(errbuf);
+	cout << if_name << endl;
+	pcap_if_t* selectedIf = listAdaptor(if_name);
+	cout << selectedIf->name << endl;
+	char sndBuf[200];
+	
+	cout << "selectedAdp" << endl;
+	selectedAdp = pcap_open_live(if_name, 65536, 1, 1000, errbuf);
+	cout << "selectedEnd" << endl;
 	ether_header eh;
 	for (int i = 0; i < 6; i++) {
 		eh.h_dest[i] = 0xff;
@@ -25,7 +34,7 @@ int main()
 	}
 	eh.type = htons(0x888f);
 
-	gateway_hello_packet updatePack;
+	auth_hello_packet updatePack;
 	long addr = ((struct sockaddr_in*)selectedIf->addresses->addr)->sin_addr.s_addr;
 	updatePack.gateway_info.ip.byte1 = 0xff000000 & addr >> 6;
 	updatePack.gateway_info.ip.byte2 = 0x00ff0000 & addr >> 4;
@@ -52,25 +61,21 @@ int main()
 	listenMain.join();
 	bcth.join();
 }
-list<DeviceIdPair*> listAdaptor()
+// list adaptor for windows version
+pcap_if_t* listAdaptor(char* name)
 {
-	list<DeviceIdPair*> list;
 	pcap_if_t* alldevs;
 	pcap_if_t* d;
-	int adapNum = 0;
 	char errbuf[PCAP_ERRBUF_SIZE];
 	pcap_findalldevs(&alldevs, errbuf);
 	int selectId = 0;
 	for (d = alldevs; d; d = d->next) {
-		DeviceIdPair* pair = new DeviceIdPair(d, selectId);
-		list.push_back(pair);
-		ifprint(d, selectId);
-		selectId++;
-		cout << endl;
+		if(!strcmp(name, d->name)){
+			return d;
+		}
 	}
-
 	pcap_freealldevs(alldevs);
-	return list;
+	return nullptr;
 }
 
 void ifprint(pcap_if_t* d, int selectId) {
@@ -95,7 +100,7 @@ void ifprint(pcap_if_t* d, int selectId) {
 	cout << "\tNet Mask: \t" << net_mask_str << endl;
 }
 
-pcap_if_t* selectAdaptor(int id, list<DeviceIdPair*> list) {
+/*pcap_if_t* selectAdaptor(int id, list<DeviceIdPair*> list) {
 
 	for (DeviceIdPair* p : list) {
 		if (p->get_id() == id) {
@@ -104,58 +109,66 @@ pcap_if_t* selectAdaptor(int id, list<DeviceIdPair*> list) {
 	}
 	cout << "Device id not found." << endl;
 	return NULL;
-}
+}*/
 
 bpf_program* setDeviceFilter(pcap_if_t* d, pcap_t* opened, char* packetFilter) {
+	cout << "set dev filter" << endl;
 	struct bpf_program fcode;
 	u_int netmask;
 	bpf_program* fcodeptr = NULL;
-	if (d->addresses != NULL) {
-		netmask = ((struct sockaddr_in*)(d->addresses->netmask))->sin_addr.s_addr;
-	}
-	else {
-		netmask = 0xffffff;
-	}
-	if (pcap_compile(opened, &fcode, packetFilter, 1, netmask) < 0) {
+	
+	if (pcap_compile(opened, &fcode, packetFilter, 1, 0) < 0) {
 		// unable to compile
+		cout << "unable to compile filter" << endl;
 	}
 	else {
 
 		fcodeptr = &fcode;
+		
+		cout << "set dev filter end" << endl;
 		return fcodeptr;
 	}
+	
+	cout << "set dev filter end" << endl;
 	return fcodeptr;
 }
 
 void broadcast_thread(pcap_t* selectedAdp, char* sndBuf, int index) {
+	cout << "broadcast thread" << endl;
 	while (true) {
 		if (pcap_sendpacket(selectedAdp, (u_char*)sndBuf, index) != 0) {
 			cout << "error sending packet" << endl;
 		}
 		cout << "send updating successful" << endl;
 		cout << sndBuf << endl;
+		cout << "broadcast thread end" << endl;
 		sleep(5000);
 	}
 }
 
 void listen_main_thread(pcap_if_t* selectedIf, pcap_t* selectedAdp) {
+	cout << "listen main thread" << endl;
 	char errbuf[100];
 	char* filter = (char*)"ether";
 	bpf_program* fcode = setDeviceFilter(selectedIf, selectedAdp, filter);
 	pcap_setfilter(selectedAdp, fcode);
 	pcap_loop(selectedAdp, 0, handle_connection_main_thread, NULL);
 	
+	cout << "listen main thread end" << endl;
 }
 
 
 
 void handle_connection_main_thread(u_char* param, const struct pcap_pkthdr* header, const u_char* packetData) {
+	
+	
 	ether_header* eh;
 	eh = (ether_header*)packetData;
 	if (ntohs(eh->type) == 0x888f) {
+		cout << "handle connection thread" << endl;
 		auth_header* auth_hdr = (auth_header*)((u_char*)packetData + 14);
 		if(auth_hdr->type == 0x2){
-			std::cout << "here" << std::endl;
+			std::cout << "auth_hdr type: 0x2" << std::endl;
 			cout << "start reveived" << endl;
 			auth_start_packet* asp = (auth_start_packet*)((u_char*)packetData + 14);
 			cout << packetData << endl;
@@ -175,15 +188,44 @@ void handle_connection_main_thread(u_char* param, const struct pcap_pkthdr* head
     			memset(&ser_addr, 0, sizeof(ser_addr));
     			ser_addr.sin_family = AF_INET;
     			in_addr_t client_addr;
-    			inet_aton("192.168.1.101", (in_addr*)&client_addr);
+    			inet_aton(IP_STR, (in_addr*)&client_addr);
     			ser_addr.sin_addr.s_addr = client_addr;
     			ser_addr.sin_port = htons(1188);
-    			udp_startSnd_askRecv_handle(client_fd, (sockaddr*)&ser_addr, asp, );
-    			close(client_fd);
+    			udp_startSnd_askRecv_handle(gateway_fd, (sockaddr*)&ser_addr, asp, selectedAdp);
+    			close(gateway_fd);
+			}
+		} else if(auth_hdr->type == 0x4){
+			std::cout << "auth_hdr type: 0x4" << std::endl;
+			cout << "answer received" << endl;
+			auth_answer_packet* aap = (auth_answer_packet*)((u_char*)packetData + 14);
+			cout << packetData << endl;
+			cout << "client identifier: " << aap->client_id << endl;
+			bool check = checkThreadExistency((int)aap->client_id);
+			if (check) {
+				cout << "create socket connection to server" << endl;
+				//TODO: add ethernet packet handle here
+				int gateway_fd;
+   				struct sockaddr_in ser_addr;
+   				gateway_fd = socket(AF_INET, SOCK_DGRAM, 0);
+    			if(gateway_fd < 0){
+    			    std::cout << "create socket failed" << std::endl;
+    			    return;
+    			}
+    			memset(&ser_addr, 0, sizeof(ser_addr));
+    			ser_addr.sin_family = AF_INET;
+    			in_addr_t client_addr;
+    			inet_aton(IP_STR, (in_addr*)&client_addr);
+    			ser_addr.sin_addr.s_addr = client_addr;
+    			ser_addr.sin_port = htons(1188);
+    			udp_answerSnd_responseRecv_handle(gateway_fd, (sockaddr*)&ser_addr, aap, selectedAdp);
+    			close(gateway_fd);
+			} else {
+				cout << "ERROR: CLIENT NOT STARTED" << endl;
 			}
 		}
-		
+		cout << "handle connection thread end" << endl;
 	}
+	
 }
 
 void udp_startSnd_askRecv_handle(int fd, struct sockaddr* dst, auth_start_packet *asp, pcap_t* selectedAdp) {

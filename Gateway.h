@@ -10,18 +10,18 @@
 #include <pcap/pcap.h>
 #include <list>
 #include <thread>
-#include <hash_map>
 #include <memory.h>
 #include <unistd.h>
 #include "packet.h"
 #include "DeviceIdPair.h"
+#include "config.h"
 #pragma comment(lib,"ws2_32.lib")
 #pragma comment(lib, "Lib/x64/wpcap.lib")
 using namespace std;
 
-list<DeviceIdPair*> listAdaptor();
+pcap_if_t* listAdaptor(char* name);
 void ifprint(pcap_if_t* d, int selectId);
-pcap_if_t* selectAdaptor(int id, list<DeviceIdPair*> list);
+//pcap_if_t* selectAdaptor(int id, list<DeviceIdPair*> list);
 void broadcast_thread(pcap_t* selectedAdp, char* sndBuf, int index);
 void listen_main_thread(pcap_if_t* selectedIf, pcap_t* selectedAdp);
 bpf_program* setDeviceFilter(pcap_if_t* d, pcap_t* opened, char* packetFilter);

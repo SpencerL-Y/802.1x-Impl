@@ -9,17 +9,16 @@ pcap_t* selectedAdp;
 bpf_program* fcode;
 int main()
 {
-	list<DeviceIdPair*> list = listAdaptor();
-	int id;
-	cout << "select adaptor: ";
-	cin >> id;
+	char errbuf[100];
+	char* if_name = pcap_lookupdev(errbuf);
+	cout << if_name << endl;
+	selectedIf = listAdaptor(if_name);
 	int start = 0;
 	while (start != 1) {
-		cout << "start?: ";
+		cout << "enter any str to start: ";
 		cin >> start;
 	}
-	selectedIf = selectAdaptor(id, list);
-	char errbuf[100];
+	//selectedIf = selectAdaptor(id, list);
 	selectedAdp = pcap_open_live(selectedIf->name, 65536, 1, 1, errbuf);
 	char* filter = (char*)"ether";
 	fcode = setDeviceFilter(selectedIf, selectedAdp, filter);
@@ -28,25 +27,20 @@ int main()
 	findThd.join();
 }
 
-list<DeviceIdPair*> listAdaptor()
+pcap_if_t* listAdaptor(char* name)
 {
-	list<DeviceIdPair*> list;
 	pcap_if_t* alldevs;
 	pcap_if_t* d;
-	int adapNum = 0;
 	char errbuf[PCAP_ERRBUF_SIZE];
 	pcap_findalldevs(&alldevs, errbuf);
 	int selectId = 0;
 	for (d = alldevs; d; d = d->next) {
-		DeviceIdPair* pair = new DeviceIdPair(d, selectId);
-		list.push_back(pair);
-		ifprint(d, selectId);
-		selectId++;
-		cout << endl;
+		if(!strcmp(name, d->name)){
+			return d;
+		}
 	}
-
 	pcap_freealldevs(alldevs);
-	return list;
+	return nullptr;
 }
 
 void ifprint(pcap_if_t* d, int selectId) {
@@ -109,26 +103,37 @@ bpf_program* setDeviceFilter(pcap_if_t* d, pcap_t* opened, char* packetFilter) {
 void handle_ether_thread(u_char* param, const struct pcap_pkthdr* header, const u_char* packetData) {
 	ether_header* eh;
 	eh = (ether_header*)packetData;
-	gateway_hello_packet* ghp = (gateway_hello_packet*)((u_char*)packetData + 14);
+	auth_header* ah = (auth_header*)((u_char*)packetData + 14);
 
 	if (ntohs(eh->type) == 0x888f) {
-		if (ghp->auth_hdr.type == 0x1) {
+		if (ah->type == 0x1) {
 			// solve for broadcast
+			auth_hello_packet* ghp = (auth_hello_packet*)((u_char*)packetData + 14);
 			cout << "Broadcast received" << endl;
 			cout << packetData << endl;
 			cout << ghp->gateway_info.mac[0] << endl;
 			if (ghp->gateway_id == 0x8) {
 				cout << "id correct" << endl;
 				gatewayFound = 1;
-				thread th(&handle_connection_thread, selectedAdp);
+				thread th(&handle_start_thread, selectedAdp);
 				th.join();
 			}
+		} else if(ah->type == 0x3){
+			auth_ask_packet* gap = (auth_ask_packet*)((u_char*)packetData + 14);
+			cout << "Server ask received" << endl;
+			cout << packetData << endl;
+			thread th(&handle_ask_thread, selectedAdp);
+			th.join();
+
+		} else if(ah->type == 0x5){
+			cout << "Server response received" << endl;
+			//TODO: add handle.
 		}
 		
 	}
 }
 
-void handle_connection_thread(pcap_t* selectedAdp) {
+void handle_start_thread(pcap_t* selectedAdp) {
 	ether_header eh;
 	auth_start_packet authStart;
 
@@ -139,7 +144,7 @@ void handle_connection_thread(pcap_t* selectedAdp) {
 		eh.h_dest[i] = 0xff;
 		eh.h_source[i] = 0x22;
 	}
-	authStart.auth_hdr.type = 2;
+	authStart.auth_hdr.type = 0x2;
 	authStart.client_id = 0x1;
 	for (int i = 0; i < 6; i++) {
 		authStart.client_info.mac[i] = 0x22;
@@ -164,6 +169,41 @@ void handle_connection_thread(pcap_t* selectedAdp) {
 	cout << "sent size: " << index << endl;
 	cout << "buffer sent: " << sndBuf << endl;
 
+}
+
+void handle_ask_thread(pcap_t* selectedAdp){
+	ether_header eh;
+	auth_answer_packet authAnswer;
+
+	memset(&eh, 0, sizeof(eh));
+	memset(&authAnswer, 0, sizeof(authAnswer));
+	eh.type = htons(0x888f);
+	for (int i = 0; i < 6; i++) {
+		eh.h_dest[i] = 0xff;
+		eh.h_source[i] = 0x22;
+	}
+	authAnswer.auth_hdr.type = 0x4;
+	authAnswer.client_id = 0x1;
+	authAnswer.random_num_decrypted = htonl(4096);
+	authAnswer.client_id = 0x8;
+	char sndBuf[200];
+	memset(sndBuf, 0, 200);
+	int index = 0;
+	memcpy(sndBuf + index, &eh, sizeof(eh));
+	index += sizeof(eh);
+	memcpy(sndBuf + index, &authAnswer, sizeof(authAnswer));
+	index += sizeof(authAnswer);
+	if (index <= 42) {
+		index = 42;
+	}
+	cout << "auth start id: " << (int)authAnswer.client_id << " size: " << index << endl;
+	if (pcap_sendpacket(selectedAdp, (u_char*)sndBuf, index) != 0) {
+		cout << "send buf error" << endl;
+	}
+	
+	cout << "send authStart successful" << endl;
+	cout << "sent size: " << index << endl;
+	cout << "buffer sent: " << sndBuf << endl;
 }
 
 void find_gateway_thread(pcap_t* selectedAdp) {

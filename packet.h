@@ -37,9 +37,10 @@ typedef struct {
 	auth_header auth_hdr;
 	identifier gateway_id;
 	info_t gateway_info;
-} gateway_hello_packet;
+} auth_hello_packet;
 
 typedef struct {
+	// type = 0x2
 	auth_header auth_hdr;
 	identifier client_id;
 	info_t client_info;
@@ -47,6 +48,7 @@ typedef struct {
 } auth_start_packet;
 
 typedef struct {
+	// type = 0x3
 	auth_header auth_hdr;
 	identifier client_id;
 	u_int32_t random_num_encrypted;
@@ -54,12 +56,14 @@ typedef struct {
 } auth_ask_packet;
 
 typedef struct {
+	// type= 0x4
 	auth_header auth_hdr;
 	identifier client_id;
 	u_int32_t random_num_decrypted;
 } auth_answer_packet;
 
 typedef struct {
+	// type = 0x5
 	auth_header auth_hdr;
 	identifier client_id;
 	bool auth_result;

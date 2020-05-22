@@ -18,6 +18,7 @@ void udp_startRecv_askSnd_answerRecv_responseSnd_handle(int fd) {
 		std::cout << "recv data failed" << std::endl;
 		return;
 	}
+	std::cout << buf << endl;
 	std::cout << "Reiceive gateway start: " << buf << std::endl;
 	// send ask part
 	// TODO: add 
@@ -55,7 +56,7 @@ int main()
 	}
 	memset(&ser_addr, 0, sizeof(ser_addr));
 	ser_addr.sin_family = AF_INET;in_addr_t addrServ;
-    inet_aton("192.168.1.101", (in_addr*)&addrServ);
+    inet_aton(IP_STR, (in_addr*)&addrServ);
     ser_addr.sin_addr.s_addr = (uint32_t)addrServ;
 	ser_addr.sin_port = htons(1188);
 	ret = bind(server_fd, (struct sockaddr*) & ser_addr, sizeof(ser_addr));

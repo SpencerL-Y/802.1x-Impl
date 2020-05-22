@@ -13,6 +13,7 @@
 #include "packet.h"
 #include <memory.h>
 #include <unistd.h>
+#include "config.h"
 #pragma comment(lib,"ws2_32.lib")
 #pragma comment(lib, "Lib/x64/wpcap.lib")
 using namespace std;
