@@ -244,10 +244,24 @@ void udp_startSnd_askRecv_handle(int fd, struct sockaddr* dst, auth_start_packet
 	std::cout << "Gateway: recv ask packet " << buf << std::endl;
 
 	// transmit the data to client
-	//TODO: add
-	memset(buf, 0, 1024);
-	data_len = 0;
-	if (pcap_sendpacket(selectedAdp, (u_char*)buf, data_len) != 0) {
+	char ether_buf[1024];
+	memset(ether_buf, 0, 1024);
+	ether_header eh;
+	eh.type = htons(0x888f);
+	for (int i = 0; i < 6; i++) {
+		eh.h_dest[i] = 0xff;
+		eh.h_source[i] = 0x11;
+	}
+	auth_ask_packet* aap = (auth_ask_packet*)buf;
+	if(aap->auth_hdr.type == 0x4){
+		cout << "ask packet received" << endl;
+	}
+	int index = 0;
+	memcpy(ether_buf, &eh, sizeof(eh));
+	index += sizeof(eh);
+	memcpy(ether_buf + index, buf, sizeof(*aap));
+	index += sizeof(*aap);
+	if (pcap_sendpacket(selectedAdp, (u_char*)ether_buf, index) != 0) {
 		cout << "send error" << endl;
 	}
 }
@@ -266,17 +280,24 @@ void udp_answerSnd_responseRecv_handle(int fd, struct sockaddr* dst, auth_answer
 	memset(buf, 0, 1024);
 	recvfrom(fd, buf, 1024, 0, (struct sockaddr*) & src, &len);
 	std::cout << "Gateway: recv response packet " << buf << std::endl;
-	//TODO: add
-	memset(buf, 0, 1024);
-	data_len = 0;
-	if (pcap_sendpacket(selectedAdp, (u_char*)buf, data_len)) {
+	// transmit data to client
+	char ether_buf[1024];
+	memset(ether_buf, 0, 1024);
+	int index = 0;
+	ether_header eh;
+	eh.type = htons(0x888f);
+	for (int i = 0; i < 6; i++) {
+		eh.h_dest[i] = 0xff;
+		eh.h_source[i] = 0x11;
+	}
+	auth_response_packet* arep = (auth_response_packet*)buf;
+	memcpy(ether_buf, &eh, sizeof(eh));
+	index += sizeof(eh);
+	memcpy(ether_buf + index, buf, sizeof(*arep));
+	index += sizeof(*arep);
+	if (pcap_sendpacket(selectedAdp, (u_char*)ether_buf, index)) {
 		cout << "send error" << endl;
 	}
-}
-
-
-void handle_connection_thread(auth_start_packet* asp) {
-
 }
 
 

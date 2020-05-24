@@ -180,12 +180,11 @@ void handle_ask_thread(pcap_t* selectedAdp){
 	eh.type = htons(0x888f);
 	for (int i = 0; i < 6; i++) {
 		eh.h_dest[i] = 0xff;
-		eh.h_source[i] = 0x22;
+		eh.h_source[i] = 0x11;
 	}
 	authAnswer.auth_hdr.type = 0x4;
 	authAnswer.client_id = 0x1;
 	authAnswer.random_num_decrypted = htonl(4096);
-	authAnswer.client_id = 0x8;
 	char sndBuf[200];
 	memset(sndBuf, 0, 200);
 	int index = 0;
