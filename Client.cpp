@@ -14,15 +14,18 @@ int main()
 	cout << if_name << endl;
 	selectedIf = listAdaptor(if_name);
 	int start = 0;
-	while (start != 1) {
-		cout << "enter any str to start: ";
-		cin >> start;
-	}
+	cout << "enter any str to start: ";
+	cin >> start;
+	
 	//selectedIf = selectAdaptor(id, list);
+	cout << "pcap open" << endl;
 	selectedAdp = pcap_open_live(selectedIf->name, 65536, 1, 1, errbuf);
+	cout << "pcap open end" << endl;
 	char* filter = (char*)"ether";
+	cout << "set filter" << endl;
 	fcode = setDeviceFilter(selectedIf, selectedAdp, filter);
 	pcap_setfilter(selectedAdp, fcode);
+	cout << "set filter end" << endl;
 	thread findThd(&find_gateway_thread, selectedAdp);
 	findThd.join();
 }
@@ -64,7 +67,7 @@ void ifprint(pcap_if_t* d, int selectId) {
 	char* net_mask_str = inet_ntoa(net_ip_address);
 	cout << "\tNet Mask: \t" << net_mask_str << endl;
 }
-
+/*
 pcap_if_t* selectAdaptor(int id, list<DeviceIdPair*> list) {
 
 	for (DeviceIdPair* p : list) {
@@ -74,24 +77,24 @@ pcap_if_t* selectAdaptor(int id, list<DeviceIdPair*> list) {
 	}
 	cout << "Device id not found." << endl;
 	return NULL;
-}
+}*/
 
 
 bpf_program* setDeviceFilter(pcap_if_t* d, pcap_t* opened, char* packetFilter) {
 	struct bpf_program fcode;
+	bpf_u_int32 netp, maskp;
+	char errbuf[100];
+	pcap_lookupnet(d->name, &netp, &maskp, errbuf);
 	u_int netmask;
 	bpf_program* fcodeptr = NULL;
-	if (d->addresses != NULL) {
-		netmask = ((struct sockaddr_in*)(d->addresses->netmask))->sin_addr.s_addr;
-	}
-	else {
-		netmask = 0xffffff;
-	}
-	if (pcap_compile(opened, &fcode, packetFilter, 1, netmask) < 0) {
+	netmask = 0xffffff;
+	if (pcap_compile(opened, &fcode, packetFilter, 0, netp) < 0) {
 		// unable to compile
+		cout << "unable to compile" << endl;
+		char* errStr = pcap_geterr(opened);
+		cout << errStr << endl;
 	}
 	else {
-
 		fcodeptr = &fcode;
 		return fcodeptr;
 	}
@@ -207,7 +210,7 @@ void handle_ask_thread(pcap_t* selectedAdp){
 
 void find_gateway_thread(pcap_t* selectedAdp) {
 	while (!gatewayFound) {
-		pcap_loop(selectedAdp, 1, handle_ether_thread, NULL);
+		pcap_loop(selectedAdp, 0, handle_ether_thread, NULL);
 	}
 }
 

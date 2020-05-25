@@ -53,13 +53,14 @@ int main()
 	index += sizeof(updatePack);
 	cout << index << endl;
 	// thread for broadcasting hello packets
-	thread bcth(&broadcast_thread, selectedAdp, sndBuf, index);
-
+	//thread bcth(&broadcast_thread, selectedAdp, sndBuf, index);
+	broadcast_thread(selectedAdp, sndBuf, index);
 	// thread for sniffering client inet packet
 	thread listenMain(&listen_main_thread, selectedIf, selectedAdp);
-
+	//listen_main_thread(selectedIf, selectedAdp);
 	listenMain.join();
-	bcth.join();
+	//bcth.join();
+
 }
 // list adaptor for windows version
 pcap_if_t* listAdaptor(char* name)
@@ -112,37 +113,32 @@ void ifprint(pcap_if_t* d, int selectId) {
 }*/
 
 bpf_program* setDeviceFilter(pcap_if_t* d, pcap_t* opened, char* packetFilter) {
-	cout << "set dev filter" << endl;
 	struct bpf_program fcode;
 	u_int netmask;
 	bpf_program* fcodeptr = NULL;
-	
-	if (pcap_compile(opened, &fcode, packetFilter, 1, 0) < 0) {
+	netmask = 0xffffff;
+	if (pcap_compile(opened, &fcode, packetFilter, 1, netmask) < 0) {
 		// unable to compile
-		cout << "unable to compile filter" << endl;
+		cout << "unable to compile" << endl;
 	}
 	else {
 
 		fcodeptr = &fcode;
-		
-		cout << "set dev filter end" << endl;
 		return fcodeptr;
 	}
-	
-	cout << "set dev filter end" << endl;
 	return fcodeptr;
 }
 
 void broadcast_thread(pcap_t* selectedAdp, char* sndBuf, int index) {
 	cout << "broadcast thread" << endl;
-	while (true) {
+	int i = 1;
+	while (i-- > 0) {
 		if (pcap_sendpacket(selectedAdp, (u_char*)sndBuf, index) != 0) {
 			cout << "error sending packet" << endl;
 		}
 		cout << "send updating successful" << endl;
 		cout << sndBuf << endl;
-		cout << "broadcast thread end" << endl;
-		sleep(5000);
+		sleep(1);
 	}
 }
 
@@ -253,7 +249,7 @@ void udp_startSnd_askRecv_handle(int fd, struct sockaddr* dst, auth_start_packet
 		eh.h_source[i] = 0x11;
 	}
 	auth_ask_packet* aap = (auth_ask_packet*)buf;
-	if(aap->auth_hdr.type == 0x4){
+	if(aap->auth_hdr.type == 0x3){
 		cout << "ask packet received" << endl;
 	}
 	int index = 0;
@@ -264,6 +260,8 @@ void udp_startSnd_askRecv_handle(int fd, struct sockaddr* dst, auth_start_packet
 	if (pcap_sendpacket(selectedAdp, (u_char*)ether_buf, index) != 0) {
 		cout << "send error" << endl;
 	}
+	cout << "gateway send ether ask packet:" << endl;
+	cout << ether_buf << endl;
 }
 
 void udp_answerSnd_responseRecv_handle(int fd, struct sockaddr* dst, auth_answer_packet* aap, pcap_t* selectedAdp) {
@@ -280,6 +278,10 @@ void udp_answerSnd_responseRecv_handle(int fd, struct sockaddr* dst, auth_answer
 	memset(buf, 0, 1024);
 	recvfrom(fd, buf, 1024, 0, (struct sockaddr*) & src, &len);
 	std::cout << "Gateway: recv response packet " << buf << std::endl;
+	auth_response_packet* arep = (auth_response_packet*)buf;
+	if(arep->auth_hdr.type = 0x5){
+		cout << "response packet received" << endl;
+	}
 	// transmit data to client
 	char ether_buf[1024];
 	memset(ether_buf, 0, 1024);
@@ -290,7 +292,6 @@ void udp_answerSnd_responseRecv_handle(int fd, struct sockaddr* dst, auth_answer
 		eh.h_dest[i] = 0xff;
 		eh.h_source[i] = 0x11;
 	}
-	auth_response_packet* arep = (auth_response_packet*)buf;
 	memcpy(ether_buf, &eh, sizeof(eh));
 	index += sizeof(eh);
 	memcpy(ether_buf + index, buf, sizeof(*arep));

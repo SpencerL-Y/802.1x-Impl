@@ -25,7 +25,7 @@ void udp_startRecv_askSnd_answerRecv_responseSnd_handle(int fd) {
 	std::cout << buf << endl;
 	// send ask part
 	auth_ask_packet aap;
-	aap.auth_hdr.type = 0x2;
+	aap.auth_hdr.type = 0x3;
 	aap.client_id = asp->client_id;
 	aap.server_id = 0x8;
 	aap.random_num_encrypted = htonl(4096);

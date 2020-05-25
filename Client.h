@@ -10,12 +10,11 @@
 #include <memory.h>
 #include <unistd.h>
 #include "packet.h"
-#include "DeviceIdPair.h"
 #include "config.h"
 #pragma comment(lib,"ws2_32.lib")
 #pragma comment(lib, "Lib/x64/wpcap.lib")
 using namespace std;
-pcap_if_t* listAdaptor();
+pcap_if_t* listAdaptor(char* name);
 void ifprint(pcap_if_t* d, int selectId);
 //pcap_if_t* selectAdaptor(int id, list<DeviceIdPair*> list);
 bpf_program* setDeviceFilter(pcap_if_t* d, pcap_t* opened, char* packetFilter);

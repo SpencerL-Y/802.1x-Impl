@@ -13,7 +13,8 @@
 #include <memory.h>
 #include <unistd.h>
 #include "packet.h"
-#include "DeviceIdPair.h"
+#include <sys/time.h>
+#include <stdlib.h>
 #include "config.h"
 #pragma comment(lib,"ws2_32.lib")
 #pragma comment(lib, "Lib/x64/wpcap.lib")
