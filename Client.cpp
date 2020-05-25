@@ -131,6 +131,7 @@ void handle_ether_thread(u_char* param, const struct pcap_pkthdr* header, const 
 		} else if(ah->type == 0x5){
 			cout << "Server response received" << endl;
 			//TODO: add handle.
+			pcap_breakloop(selectedAdp);
 		}
 		
 	}
